@@ -47,7 +47,7 @@ def is_controlnet_enabled(controlnet_args):
 def setup_controlnet_ui_raw():
     cnet = find_controlnet()
     cn_models = cnet.get_models()
-    cn_preprocessors = cnet.get_modules()
+    cn_preprocessors = cnet.get_modules(True)
 
     cn_modules = cnet.get_modules_detail()
     preprocessor_sliders_config = {}
@@ -130,8 +130,13 @@ def setup_controlnet_ui_raw():
             resize_mode = gr.Radio(choices=["Outer Fit (Shrink to Fit)", "Inner Fit (Scale to Fit)", "Just Resize"], value="Inner Fit (Scale to Fit)", label="Resize Mode", interactive=True)
         with gr.Row(visible=False) as control_loopback_row:
             loopback_mode = gr.Checkbox(label="LoopBack mode", value=False, interactive=True)
-        hide_output_list = [pixel_perfect, low_vram, mod_row, module, weight_row, start_cs_row, end_cs_row, env_row, overwrite_frames, vid_path_row, control_mode_row, mask_vid_path_row,
-                            control_loopback_row]  # add mask_vid_path_row when masks are working again
+        with gr.Row(visible=False) as control_loopback_use_init_row:
+            loopback_use_init_img = gr.Checkbox(label="LoopBack use init img (for this controlnet)", value=False, interactive=True)
+        with gr.Row(visible=False) as control_loopback_init_img_row:
+            loopback_init_img = gr.Textbox(label="Init image (for this controlnet)", lines=1, interactive=True, value = '')
+        with gr.Row(visible=False) as control_loopback_prefer_init_sample_row:
+            loopback_prefer_init_sample = gr.Checkbox(label="LoopBack prefer transformed image (for this controlnet)", value=True, interactive=True)
+        hide_output_list = [pixel_perfect,low_vram,mod_row,module,weight_row,start_cs_row, end_cs_row,env_row,overwrite_frames,vid_path_row,control_mode_row, mask_vid_path_row, control_loopback_row, control_loopback_use_init_row, control_loopback_init_img_row, control_loopback_prefer_init_sample_row] # add mask_vid_path_row when masks are working again
         for cn_output in hide_output_list:
             enabled.change(fn=hide_ui_by_cn_status, inputs=enabled, outputs=cn_output)
         module.change(build_sliders, inputs=[module, pixel_perfect], outputs=[processor_res, threshold_a, threshold_b, advanced_column, model, refresh_models])
@@ -150,7 +155,7 @@ def setup_controlnet_ui_raw():
         return {key: value for key, value in locals().items() if key in [
             "enabled", "pixel_perfect", "low_vram", "module", "model", "weight",
             "guidance_start", "guidance_end", "processor_res", "threshold_a", "threshold_b", "resize_mode", "control_mode",
-            "overwrite_frames", "vid_path", "mask_vid_path", "loopback_mode"
+            "overwrite_frames", "vid_path", "mask_vid_path", "loopback_mode", "loopback_use_init_img", "loopback_init_img", "loopback_prefer_init_sample"
         ]}
 
     def refresh_all_models(*inputs):
@@ -194,7 +199,8 @@ def controlnet_component_names():
         'overwrite_frames', 'vid_path', 'mask_vid_path', 'enabled',
         'low_vram', 'pixel_perfect',
         'module', 'model', 'weight', 'guidance_start', 'guidance_end',
-        'processor_res', 'threshold_a', 'threshold_b', 'resize_mode', 'control_mode', 'loopback_mode'
+        'processor_res', 'threshold_a', 'threshold_b', 'resize_mode', 'control_mode', 
+        'loopback_mode', 'loopback_use_init_img', 'loopback_init_img', 'loopback_prefer_init_sample'
     ]]
 
 def process_with_controlnet(p, args, anim_args, controlnet_args, root, is_img2img=True, frame_idx=0):
@@ -202,17 +208,30 @@ def process_with_controlnet(p, args, anim_args, controlnet_args, root, is_img2im
 
     def read_cn_data(cn_idx):
         cn_mask_np, cn_image_np = None, None
+        loopback_mode = getattr(controlnet_args, f'cn_{cn_idx}_loopback_mode')
+        loopback_use_init_img = getattr(controlnet_args, f'cn_{cn_idx}_loopback_use_init_img')
+        loopback_init_img = getattr(controlnet_args, f'cn_{cn_idx}_loopback_init_img')
+        loopback_prefer_init_sample = getattr(controlnet_args, f'cn_{cn_idx}_loopback_prefer_init_sample')
+        loopback_img = root.loopback_img
+        init_sample = root.init_sample
+        img_to_loopback_on = None
+        if (loopback_prefer_init_sample and init_sample is not None):
+            img_to_loopback_on = init_sample
+        else:
+            img_to_loopback_on = loopback_img
         # Loopback mode ENABLED:
-        if getattr(controlnet_args, f'cn_{cn_idx}_loopback_mode'):
+        if loopback_mode:
             # On very first frame, check if use init enabled, and if init image is provided
-            if frame_idx == 0 and args.use_init and args.init_image is not None:
-                cn_image_np = load_image(args.init_image)
-                # convert to uint8 for compatibility with CN
+            # note that this is now controlnet specific
+            if frame_idx == 0 and loopback_use_init_img and loopback_init_img is not None:
+                cn_image_np = load_image(loopback_init_img)
+                # convert to uint8 for compatability with CN
                 cn_image_np = np.array(cn_image_np).astype('uint8')
             # Not first frame, use previous img (init_sample)
-            elif frame_idx > 0 and root.init_sample:
-                cn_image_np = np.array(root.init_sample).astype('uint8')
+            elif frame_idx > 0 and img_to_loopback_on:
+                cn_image_np = np.array(img_to_loopback_on).astype('uint8')
         else:  # loopback mode is DISABLED
+            print('loopback disabled')
             cn_inputframes = os.path.join(args.outdir, f'controlnet_{cn_idx}_inputframes')  # set input frames folder path
             if os.path.exists(cn_inputframes):
                 if count_files_in_folder(cn_inputframes) == 1:
@@ -253,7 +272,7 @@ def process_with_controlnet(p, args, anim_args, controlnet_args, root, is_img2im
 
         keys = [
             "enabled", "module", "model", "weight", "resize_mode", "control_mode", "low_vram", "pixel_perfect",
-            "processor_res", "threshold_a", "threshold_b", "guidance_start", "guidance_end"
+            "processor_res", "threshold_a", "threshold_b", "guidance_start", "guidance_end", "loopback_use_init_img", "loopback_init_img"
         ]
         cnu = {k: getattr(cn_args, f"{prefix}_{k}") for k in keys}
         model_num = int(prefix.split('_')[-1])  # Extract model number from prefix (e.g., "cn_1" -> 1)
