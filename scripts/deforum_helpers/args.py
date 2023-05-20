@@ -26,6 +26,7 @@ def RootArgs():
         "subseed_strength": 0,
         "seed_internal": 0,
         "init_sample": None,
+        "loopback_img": None,
         "noise_mask": None,
         "initial_info": None,
         "first_frame": None,

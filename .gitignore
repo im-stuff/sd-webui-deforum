@@ -10,3 +10,4 @@ outputs
 cc-outputs.log
 *.safetensors
 scripts/deforum_helpers/navigation.py
+.vscode/settings.json

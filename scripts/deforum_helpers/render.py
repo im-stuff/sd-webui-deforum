@@ -606,6 +606,7 @@ def render_animation(args, anim_args, video_args, parseq_args, loop_args, contro
         state.current_image = image
 
         args.seed = next_seed(args, root)
+        root.loopback_img = image
 
     if predict_depths and not keep_in_vram:
         depth_model.delete_model()  # handles adabins too
