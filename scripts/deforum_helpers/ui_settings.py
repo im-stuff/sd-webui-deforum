@@ -17,3 +17,5 @@ def on_ui_settings():
     opts.add_option("deforum_save_gen_info_as_srt", OptionInfo(False, "Save an .srt (subtitles) file with the generation info along with each animation", gr.Checkbox, {"interactive": True}, section=section))  
     opts.add_option("deforum_embed_srt", OptionInfo(False, "If .srt file is saved, soft-embed the subtitles into the rendered video file", gr.Checkbox, {"interactive": True}, section=section))  
     opts.add_option("deforum_save_gen_info_as_srt_params", OptionInfo(['Noise Schedule'], "Choose which animation params are to be saved to the .srt file (Frame # and Seed will always be saved):", ui_components.DropdownMulti, lambda: {"interactive": True, "choices": srt_ui_params}, section=section)) 
+    opts.add_option("deforum_enable_discord_webhook", OptionInfo(False, "Enable Discord WebHooks to send a message to a channel when your Deforum job is completed", gr.Checkbox, {"interactive": True}, section=section))
+    opts.add_option("deforum_discord_webhook_url", OptionInfo("<enter your discord web hook url here>", "Enter your Discord webhook URL", section=section)) 
