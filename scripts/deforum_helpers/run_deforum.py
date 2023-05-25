@@ -4,7 +4,6 @@ import traceback
 import gc
 import torch
 import timeit
-import datetime
 import modules.shared as shared
 from modules.processing import Processed, StableDiffusionProcessingImg2Img
 from .args import get_component_names, process_args
@@ -15,6 +14,7 @@ from .general_utils import get_deforum_version
 from .upscaling import make_upscale_v2
 from .video_audio_utilities import ffmpeg_stitch_video, make_gifski_gif, handle_imgs_deletion, get_ffmpeg_params
 from . import discord_utils
+from . import settings
 
 # this global param will contain the latest generated video HTML-data-URL info (for preview inside the UI when needed)
 last_vid_data = None
@@ -172,7 +172,7 @@ def run_deforum(*args):
 
         if shared.opts.data.get("deforum_enable_persistent_settings", False):
             persistent_sett_path = shared.opts.data.get("deforum_persistent_settings_path")
-            deforum_settings.save_settings_from_animation_run(args, anim_args, parseq_args, loop_args, controlnet_args, video_args, root, persistent_sett_path)
+            settings.save_settings_from_animation_run(args, anim_args, parseq_args, loop_args, controlnet_args, video_args, root, persistent_sett_path)
 
         end_time = timeit.default_timer()
         if(shared.opts.data.get("deforum_enable_discord_webhook")):
